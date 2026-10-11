@@ -1,0 +1,65 @@
+/* Custom CSS Extensions for Pinoy Quest */
+
+/* Tile Grid Placement */
+.board-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    transition: all 0.2s ease;
+}
+
+/* Custom Dice Shake Keyframe Animation */
+@keyframes diceRoll {
+    0% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(90deg) scale(1.15); }
+    50% { transform: rotate(180deg) scale(0.9); }
+    75% { transform: rotate(270deg) scale(1.1); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+
+.dice-rolling {
+    animation: diceRoll 0.6s ease-in-out infinite;
+}
+
+/* Active Count Button State in Setup */
+.btn-count.active-count {
+    background-color: #f59e0b !important;
+    color: #020617 !important;
+    border-color: #f59e0b !important;
+}
+
+/* Player Token Alignment inside Board Cells */
+.token-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Pulse Glow for Quiz Tiles */
+@keyframes quizGlow {
+    0%, 100% { opacity: 0.9; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+}
+
+.quiz-tile-glow {
+    animation: quizGlow 2s infinite ease-in-out;
+}
+
+/* Custom scrollbar for game log */
+#game-log::-webkit-scrollbar {
+    width: 4px;
+}
+#game-log::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.6);
+}
+#game-log::-webkit-scrollbar-shadow {
+    background: #334155;
+    border-radius: 4px;
+}
