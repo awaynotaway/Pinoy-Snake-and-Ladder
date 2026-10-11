@@ -51,17 +51,27 @@
             </button>
         </div>
 
-        <!-- Online Multiplayer Hidden Card (Toggled via Online Multiplayer button) -->
+        <!-- Online Multiplayer Hidden Card -->
         <div id="online-card" class="max-w-md mx-auto w-full bg-slate-900 border border-slate-800 rounded-2xl p-5 mt-6 hidden text-left">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-bold text-amber-400 text-sm uppercase tracking-wide">Multiplayer Room</h3>
                 <button id="btn-close-online" class="text-slate-400 hover:text-white text-xs font-bold">✕ CLOSE</button>
             </div>
-            <div class="space-y-3">
+            <div class="space-y-4">
                 <!-- Custom Username Input -->
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Your Nickname</label>
                     <input type="text" id="menu-username-input" placeholder="ENTER YOUR NAME" maxlength="15" class="bg-slate-800 text-slate-100 text-xs font-bold uppercase px-3 py-2 rounded-xl border border-slate-700 w-full focus:outline-none">
+                </div>
+
+                <!-- Player Count Selection for Host -->
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Max Players (Host Only)</label>
+                    <div class="grid grid-cols-3 gap-2" id="menu-player-count-btns">
+                        <button type="button" data-count="2" class="menu-count-btn bg-amber-500 text-slate-950 font-bold py-1.5 rounded-lg text-xs transition">2 Players</button>
+                        <button type="button" data-count="3" class="menu-count-btn bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-1.5 rounded-lg text-xs transition">3 Players</button>
+                        <button type="button" data-count="4" class="menu-count-btn bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-1.5 rounded-lg text-xs transition">4 Players</button>
+                    </div>
                 </div>
 
                 <button onclick="createOnlineRoomMenu()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition shadow">
@@ -77,7 +87,7 @@
         </div>
     </div>
 
-    <!-- How to Play Quick Overview Box (Toggled via Rules button) -->
+    <!-- How to Play Quick Overview Box -->
     <div id="rules-card" class="max-w-2xl mx-auto w-full bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-6 hidden">
         <div class="flex justify-between items-center mb-3">
             <h3 class="font-bold text-amber-400 text-sm uppercase tracking-wider">How to Play</h3>
@@ -116,6 +126,19 @@
         let LADDERS = {};
         let SNAKES = {};
         let QUIZ_TILES = [];
+
+        // Track selected player count in menu (Default is 2)
+        let menuSelectedCount = 2;
+
+        document.querySelectorAll('.menu-count-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.menu-count-btn').forEach(b => {
+                    b.className = "menu-count-btn bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-1.5 rounded-lg text-xs transition";
+                });
+                e.target.className = "menu-count-btn bg-amber-500 text-slate-950 font-bold py-1.5 rounded-lg text-xs transition";
+                menuSelectedCount = parseInt(e.target.getAttribute('data-count'));
+            });
+        });
 
         // Board Generation Logic for Host
         function generateRandomBoardLayout() {
@@ -186,7 +209,7 @@
         });
         btnCloseOnline.addEventListener('click', () => onlineCard.classList.add('hidden'));
 
-        // Online Room Actions from Menu (Captures custom nickname)
+        // Online Room Actions from Menu
         function createOnlineRoomMenu() {
             const username = document.getElementById('menu-username-input').value.trim() || "Host (P1)";
             const roomId = "ROOM_" + Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -197,6 +220,7 @@
             
             roomRef.set({
                 gameActive: true,
+                maxPlayers: menuSelectedCount,
                 currentPlayerIdx: 0,
                 boardLayout: { 
                     ladders: LADDERS, 
@@ -210,7 +234,7 @@
                 if (navigator.clipboard) {
                     navigator.clipboard.writeText(roomId);
                 }
-                alert(`🎉 ROOM CREATED!\n\nRoom Code: ${roomId}\n\n(Copied to clipboard!)`);
+                alert(`🎉 ROOM CREATED!\n\nRoom Code: ${roomId}\nMax Players: ${menuSelectedCount}\n\n(Copied to clipboard!)`);
                 window.location.href = `game.html?room=${roomId}&player=0`;
             }).catch(err => {
                 console.error(err);
@@ -235,23 +259,25 @@
                     return;
                 }
 
-                const newPlayerId = roomData.players.length;
-                if (newPlayerId >= 4) {
-                    alert("Room is already full (max 4 players)!");
+                const currentCount = roomData.players.length;
+                const maxAllowed = roomData.maxPlayers || 4;
+
+                if (currentCount >= maxAllowed) {
+                    alert(`Room is already full! (Max allowed for this room is ${maxAllowed} players)`);
                     return;
                 }
 
                 roomData.players.push({
-                    id: newPlayerId,
+                    id: currentCount,
                     name: username,
-                    avatar: ['🇵🇭', '🦅', '🌋', '🥭'][newPlayerId],
+                    avatar: ['🇵🇭', '🦅', '🌋', '🥭'][currentCount],
                     position: 1,
-                    color: ['#f59e0b', '#3b82f6', '#10b981', '#ec4899'][newPlayerId],
+                    color: ['#f59e0b', '#3b82f6', '#10b981', '#ec4899'][currentCount],
                     isAI: false
                 });
 
                 roomRef.update({ players: roomData.players }).then(() => {
-                    window.location.href = `game.html?room=${roomId}&player=${newPlayerId}`;
+                    window.location.href = `game.html?room=${roomId}&player=${currentCount}`;
                 });
             });
         }
