@@ -89,18 +89,40 @@ function joinOnlineRoom(roomId) {
 }
 
 // Real-time Listener: Syncs changes from Firebase down to the local browser window
+let previousPlayersCount = 0; // Tracks previous active player count to detect departures
+
 function listenToRoom(roomId) {
     const roomRef = db.ref('rooms/' + roomId);
+    const myPlayerRef = db.ref(`rooms/${roomId}/players/${myPlayerId}`);
+
+    // Set up Firebase automatic disconnect listener when window closes or loses connection
+    myPlayerRef.child('online').onDisconnect().set(false);
+    myPlayerRef.child('online').set(true);
 
     roomRef.on('value', (snapshot) => {
         const data = snapshot.val();
         if (!data) return;
 
-        // Sync global game states across all connected clients
-        players = data.players || [];
+        const currentPlayers = data.players || [];
+
+        // Check if a player went offline or left
+        currentPlayers.forEach((p, idx) => {
+            if (p && p.online === false && players[idx] && players[idx].online !== false) {
+                logMessage(`🚪 <strong>${p.name}</strong> has left the game.`);
+            }
+        });
+
+        // Detect if total players reduced
+        if (previousPlayersCount > 0 && currentPlayers.length < previousPlayersCount) {
+            logMessage(`⚠️ A player disconnected from the room.`);
+        }
+        previousPlayersCount = currentPlayers.length;
+
+        // Sync global game state
+        players = currentPlayers;
         currentPlayerIdx = data.currentPlayerIdx || 0;
         gameActive = data.gameActive || false;
-        
+
         if (data.boardLayout) {
             LADDERS = data.boardLayout.ladders || {};
             SNAKES = data.boardLayout.snakes || {};

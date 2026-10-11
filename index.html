@@ -228,8 +228,8 @@
                     quizTiles: QUIZ_TILES 
                 },
                 players: [
-                    { id: 0, name: username, avatar: "🇵🇭", position: 1, color: "#f59e0b", isAI: false }
-                ]
+    { id: 0, name: username, avatar: "🇵🇭", position: 1, color: "#f59e0b", isAI: false, online: true }
+]
             }).then(() => {
                 if (navigator.clipboard) {
                     navigator.clipboard.writeText(roomId);
@@ -268,13 +268,14 @@
                 }
 
                 roomData.players.push({
-                    id: currentCount,
-                    name: username,
-                    avatar: ['🇵🇭', '🦅', '🌋', '🥭'][currentCount],
-                    position: 1,
-                    color: ['#f59e0b', '#3b82f6', '#10b981', '#ec4899'][currentCount],
-                    isAI: false
-                });
+    id: currentCount,
+    name: username,
+    avatar: ['🇵🇭', '🦅', '🌋', '🥭'][currentCount],
+    position: 1,
+    color: ['#f59e0b', '#3b82f6', '#10b981', '#ec4899'][currentCount],
+    isAI: false,
+    online: true
+});
 
                 roomRef.update({ players: roomData.players }).then(() => {
                     window.location.href = `game.html?room=${roomId}&player=${currentCount}`;
