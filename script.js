@@ -95,7 +95,7 @@ function listenToRoom(roomId) {
     const roomRef = db.ref('rooms/' + roomId);
     const myPlayerRef = db.ref(`rooms/${roomId}/players/${myPlayerId}`);
 
-    // Set up Firebase automatic disconnect listener when window closes or loses connection
+    // Set disconnect state in Firebase
     myPlayerRef.child('online').onDisconnect().set(false);
     myPlayerRef.child('online').set(true);
 
@@ -105,20 +105,13 @@ function listenToRoom(roomId) {
 
         const currentPlayers = data.players || [];
 
-        // Check if a player went offline or left
+        // Check if any player went offline
         currentPlayers.forEach((p, idx) => {
             if (p && p.online === false && players[idx] && players[idx].online !== false) {
                 logMessage(`🚪 <strong>${p.name}</strong> has left the game.`);
             }
         });
 
-        // Detect if total players reduced
-        if (previousPlayersCount > 0 && currentPlayers.length < previousPlayersCount) {
-            logMessage(`⚠️ A player disconnected from the room.`);
-        }
-        previousPlayersCount = currentPlayers.length;
-
-        // Sync global game state
         players = currentPlayers;
         currentPlayerIdx = data.currentPlayerIdx || 0;
         gameActive = data.gameActive || false;
@@ -127,6 +120,15 @@ function listenToRoom(roomId) {
             LADDERS = data.boardLayout.ladders || {};
             SNAKES = data.boardLayout.snakes || {};
             QUIZ_TILES = data.boardLayout.quizTiles || [];
+        }
+
+        // Auto-skip turn if current turn player is offline
+        const currentTurnPlayer = players[currentPlayerIdx];
+        if (gameActive && currentTurnPlayer && currentTurnPlayer.online === false) {
+            // Only host advances the turn index to prevent conflicts
+            if (myPlayerId === 0) {
+                endTurn();
+            }
         }
 
         initBoard();
@@ -891,12 +893,17 @@ function endTurn() {
 }
 
 function updateUI() {
+    // 1. Clear all token containers on the board
     for (let i = 1; i <= 100; i++) {
         const tokBox = document.getElementById(`tokens-${i}`);
         if (tokBox) tokBox.innerHTML = '';
     }
 
-    players.forEach(p => {
+    // 2. Filter active players (exclude those who left / online === false)
+    const activePlayers = players.filter(p => p.online !== false);
+
+    // 3. Render board tokens only for active online players
+    activePlayers.forEach(p => {
         const tokBox = document.getElementById(`tokens-${p.position}`);
         if (tokBox) {
             const token = document.createElement('span');
@@ -908,6 +915,7 @@ function updateUI() {
         }
     });
 
+    // 4. Update Current Turn display
     const currP = players[currentPlayerIdx];
     if (currP) {
         if (activeAvatarEl) activeAvatarEl.textContent = currP.avatar;
@@ -919,9 +927,10 @@ function updateUI() {
         if (activeTypeEl) activeTypeEl.textContent = currP.isAI ? '🤖 BOT AI' : '👤 HUMAN';
     }
 
+    // 5. Update Scoreboard (exclude offline players)
     if (scoreboardListEl) {
         scoreboardListEl.innerHTML = '';
-        const sorted = [...players].sort((a, b) => b.position - a.position);
+        const sorted = [...activePlayers].sort((a, b) => b.position - a.position);
         sorted.forEach((p, rank) => {
             const item = document.createElement('div');
             item.className = 'flex items-center justify-between bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60 text-xs';
