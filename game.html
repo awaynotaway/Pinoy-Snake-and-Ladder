@@ -21,9 +21,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <button id="btn-setup" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold px-4 py-2 rounded-lg transition shadow">
-                    ⚙️ Players Setup
-                </button>
+             
                 <button id="btn-reset" class="bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow">
                     🔄 Restart Game
                 </button>
@@ -161,6 +159,47 @@
             </button>
         </div>
     </div>
+
+    <!-- RESTART REQUEST MODAL -->
+<div id="modal-reset-request" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-center space-y-4">
+        <h3 class="text-xl font-extrabold text-amber-400">🔄 Game Restart Requested</h3>
+        <p id="reset-request-text" class="text-slate-300 text-sm">A player wants to restart the game. Do you accept?</p>
+        <div class="flex justify-center gap-3 pt-2">
+            <button id="btn-accept-reset" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-5 rounded-xl transition text-sm">
+                ✅ Accept
+            </button>
+            <button id="btn-decline-reset" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 px-5 rounded-xl transition text-sm">
+                ❌ Decline
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- WAITING FOR RESET ACCEPTANCE MODAL -->
+<div id="modal-waiting-reset" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-center space-y-4">
+        <h3 class="text-xl font-extrabold text-amber-400">⏳ Restart Requested</h3>
+        <p class="text-slate-300 text-sm">Waiting for other players to accept the restart request...</p>
+        <div class="flex justify-center pt-2">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div>
+        </div>
+    </div>
+</div>
+
+
+<!-- GENERIC GAME ALERT MODAL -->
+<div id="modal-game-alert" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-center space-y-4">
+        <h3 id="game-alert-title" class="text-xl font-extrabold text-amber-400">Notice</h3>
+        <p id="game-alert-message" class="text-slate-300 text-sm">Message goes here...</p>
+        <div class="flex justify-center pt-2">
+            <button id="btn-close-game-alert" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2 px-6 rounded-xl transition text-sm">
+                OK
+            </button>
+        </div>
+    </div>
+</div>
 
     <!-- Link to JavaScript Code -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>

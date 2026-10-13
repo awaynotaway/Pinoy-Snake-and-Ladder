@@ -94,11 +94,42 @@
             <button id="btn-close-rules" class="text-slate-400 hover:text-white text-xs font-bold">✕ CLOSE</button>
         </div>
         <ul class="text-xs text-slate-300 space-y-2 list-disc list-inside leading-relaxed">
-            <li>Roll the dice and race to reach **Tile 100**.</li>
-            <li>Ladders boost your position forward on the board.</li>
-            <li>Landing on special tiles requires answering **Philippine Trivia Questions**.</li>
-            <li>Answer correctly to maintain your spot; wrong answers send you back to your previous tile!</li>
+            <li>Roll the dice and race to reach **Tile 100**[cite: 5].</li>
+            <li>Ladders boost your position forward on the board[cite: 5].</li>
+            <li>Landing on special tiles requires answering **Philippine Trivia Questions**[cite: 5].</li>
+            <li>Answer correctly to maintain your spot; wrong answers send you back to your previous tile[cite: 5]!</li>
         </ul>
+    </div>
+
+    <!-- ROOM CREATED MODAL -->
+    <div id="modal-room-created" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-center space-y-4">
+            <div class="inline-block p-3 bg-amber-500/10 rounded-full border border-amber-500/20 text-3xl">
+                🎉
+            </div>
+            <h3 class="text-xl font-extrabold text-amber-400">Room Created Successfully!</h3>
+            <p class="text-slate-300 text-sm">Share this code with your friends:</p>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-3 font-mono text-xl font-bold text-amber-400 tracking-wider select-all" id="room-code-display">
+                ROOM_CODE
+            </div>
+            <p class="text-xs text-slate-500">(Room code copied to clipboard!)</p>
+            <button id="btn-enter-room" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl text-sm transition shadow">
+                🚀 Enter Room
+            </button>
+        </div>
+    </div>
+
+    <!-- GENERIC GAME ALERT MODAL -->
+    <div id="modal-game-alert" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-center space-y-4">
+            <h3 id="game-alert-title" class="text-xl font-extrabold text-amber-400">Notice</h3>
+            <p id="game-alert-message" class="text-slate-300 text-sm">Message goes here...</p>
+            <div class="flex justify-center pt-2">
+                <button id="btn-close-game-alert" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2 px-6 rounded-xl transition text-sm">
+                    OK
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Footer -->
@@ -121,6 +152,24 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+
+        // Modal Elements
+        const modalGameAlertEl = document.getElementById('modal-game-alert');
+        const gameAlertTitleEl = document.getElementById('game-alert-title');
+        const gameAlertMessageEl = document.getElementById('game-alert-message');
+        const btnCloseGameAlertEl = document.getElementById('btn-close-game-alert');
+
+        if (btnCloseGameAlertEl) {
+            btnCloseGameAlertEl.addEventListener('click', () => {
+                if (modalGameAlertEl) modalGameAlertEl.classList.add('hidden');
+            });
+        }
+
+        function showGameAlert(message, title = "Notice") {
+            if (gameAlertTitleEl) gameAlertTitleEl.textContent = title;
+            if (gameAlertMessageEl) gameAlertMessageEl.textContent = message;
+            if (modalGameAlertEl) modalGameAlertEl.classList.remove('hidden');
+        }
 
         // Board Layout Variables
         let LADDERS = {};
@@ -228,17 +277,24 @@
                     quizTiles: QUIZ_TILES 
                 },
                 players: [
-    { id: 0, name: username, avatar: "🇵🇭", position: 1, color: "#f59e0b", isAI: false, online: true }
-]
+                    { id: 0, name: username, avatar: "🇵🇭", position: 1, color: "#f59e0b", isAI: false, online: true }
+                ]
             }).then(() => {
                 if (navigator.clipboard) {
                     navigator.clipboard.writeText(roomId);
                 }
-                alert(`🎉 ROOM CREATED!\n\nRoom Code: ${roomId}\nMax Players: ${menuSelectedCount}\n\n(Copied to clipboard!)`);
-                window.location.href = `game.html?room=${roomId}&player=0`;
+                
+                // Display room code inside the modal and reveal it instead of alert
+                document.getElementById('room-code-display').textContent = roomId;
+                document.getElementById('modal-room-created').classList.remove('hidden');
+                
+                // Wire up Enter Room button redirection
+                document.getElementById('btn-enter-room').onclick = () => {
+                    window.location.href = `game.html?room=${roomId}&player=0`;
+                };
             }).catch(err => {
                 console.error(err);
-                alert("Error creating room. Check console.");
+                showGameAlert("Error creating room. Check console for details.", "System Error");
             });
         }
 
@@ -247,7 +303,7 @@
             const roomId = document.getElementById('menu-room-input').value.trim().toUpperCase();
             
             if (!roomId) {
-                alert("Please enter a valid room code!");
+                showGameAlert("Please enter a valid room code!", "Input Required");
                 return;
             }
 
@@ -255,7 +311,7 @@
             roomRef.once('value', (snapshot) => {
                 const roomData = snapshot.val();
                 if (!roomData) {
-                    alert("Room not found!");
+                    showGameAlert("Room not found! Please check the code and try again.", "Error");
                     return;
                 }
 
@@ -263,19 +319,19 @@
                 const maxAllowed = roomData.maxPlayers || 4;
 
                 if (currentCount >= maxAllowed) {
-                    alert(`Room is already full! (Max allowed for this room is ${maxAllowed} players)`);
+                    showGameAlert(`Room is already full! (Max allowed for this room is ${maxAllowed} players)`, "Room Full");
                     return;
                 }
 
                 roomData.players.push({
-    id: currentCount,
-    name: username,
-    avatar: ['🇵🇭', '🦅', '🌋', '🥭'][currentCount],
-    position: 1,
-    color: ['#f59e0b', '#3b82f6', '#10b981', '#ec4899'][currentCount],
-    isAI: false,
-    online: true
-});
+                    id: currentCount,
+                    name: username,
+                    avatar: ['🇵🇭', '🦅', '🌋', '🥭'][currentCount],
+                    position: 1,
+                    color: ['#f59e0b', '#3b82f6', '#10b981', '#ec4899'][currentCount],
+                    isAI: false,
+                    online: true
+                });
 
                 roomRef.update({ players: roomData.players }).then(() => {
                     window.location.href = `game.html?room=${roomId}&player=${currentCount}`;

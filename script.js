@@ -31,6 +31,31 @@ let gameActive = false;
 let isRolling = false;
 let previousTile = 1;
 
+//reset request
+const modalResetRequestEl = document.getElementById('modal-reset-request');
+const resetRequestTextEl = document.getElementById('reset-request-text');
+const btnAcceptResetEl = document.getElementById('btn-accept-reset');
+const btnDeclineResetEl = document.getElementById('btn-decline-reset');
+
+
+
+const modalWaitingResetEl = document.getElementById('modal-waiting-reset');
+const modalGameAlertEl = document.getElementById('modal-game-alert');
+const gameAlertTitleEl = document.getElementById('game-alert-title');
+const gameAlertMessageEl = document.getElementById('game-alert-message');
+const btnCloseGameAlertEl = document.getElementById('btn-close-game-alert');
+
+if (btnCloseGameAlertEl) {
+    btnCloseGameAlertEl.addEventListener('click', () => {
+        if (modalGameAlertEl) modalGameAlertEl.classList.add('hidden');
+    });
+}
+
+function showGameAlert(message, title = "Notice") {
+    if (gameAlertTitleEl) gameAlertTitleEl.textContent = title;
+    if (gameAlertMessageEl) gameAlertMessageEl.textContent = message;
+    if (modalGameAlertEl) modalGameAlertEl.classList.remove('hidden');
+}
 // Active Board Layout (Dynamically Generated per Game)
 let LADDERS = {};
 let SNAKES = {};
@@ -40,22 +65,22 @@ let QUIZ_TILES = [];
 function createOnlineRoom() {
     currentRoomId = "ROOM_" + Math.random().toString(36).substring(2, 7).toUpperCase();
     isMultiplayer = true;
-    myPlayerId = 0; // Host is Player 1
+    myPlayerId = 0;
 
     const roomRef = db.ref('rooms/' + currentRoomId);
     
-    // Set initial room data structure
     roomRef.set({
         gameActive: false,
         currentPlayerIdx: 0,
         boardLayout: { ladders: LADDERS, snakes: SNAKES, quizTiles: QUIZ_TILES },
         players: [
             { id: 0, name: "Host (P1)", avatar: "🇵🇭", position: 1, color: "#f59e0b", isAI: false }
-        ]
+        ],
+        logs: ["🌐 Room created successfully."] // Added initial log
     });
 
     listenToRoom(currentRoomId);
-    alert(`Room Created! Share Code: ${currentRoomId}`);
+    showGameAlert(`Room Created! Share Code: ${currentRoomId}`, "Multiplayer Room");
 }
 
 // Function to Join an Existing Room
@@ -67,7 +92,7 @@ function joinOnlineRoom(roomId) {
     roomRef.once('value', (snapshot) => {
         const roomData = snapshot.val();
         if (!roomData) {
-            alert("Room not found!");
+            showGameAlert("Room not found!", "Error");
             return;
         }
 
@@ -95,7 +120,6 @@ function listenToRoom(roomId) {
     const roomRef = db.ref('rooms/' + roomId);
     const myPlayerRef = db.ref(`rooms/${roomId}/players/${myPlayerId}`);
 
-    // Set disconnect state in Firebase
     myPlayerRef.child('online').onDisconnect().set(false);
     myPlayerRef.child('online').set(true);
 
@@ -105,10 +129,9 @@ function listenToRoom(roomId) {
 
         const currentPlayers = data.players || [];
 
-        // Check if any player went offline
         currentPlayers.forEach((p, idx) => {
             if (p && p.online === false && players[idx] && players[idx].online !== false) {
-                logMessage(`🚪 <strong>${p.name}</strong> has left the game.`);
+                // Handle departures if needed
             }
         });
 
@@ -122,10 +145,59 @@ function listenToRoom(roomId) {
             QUIZ_TILES = data.boardLayout.quizTiles || [];
         }
 
-        // Auto-skip turn if current turn player is offline
+        // Synchronize and render logs across all devices
+        if (data.logs && gameLogEl) {
+            gameLogEl.innerHTML = '';
+            data.logs.forEach(msg => {
+                appendLogToDOM(msg);
+            });
+        }
+
+        // --- HANDLE MULTIPLAYER RESTART REQUESTS & MODAL ---
+     // --- HANDLE MULTIPLAYER RESTART REQUESTS & MODALS ---
+       // --- HANDLE MULTIPLAYER RESTART REQUESTS & MODALS ---
+        const resetReq = data.resetRequest;
+        if (resetReq) {
+            const requesterId = resetReq.requestedBy;
+            const votes = resetReq.votes || {};
+
+            if (requesterId === myPlayerId) {
+                // Requester sees the waiting modal
+                if (modalWaitingResetEl) modalWaitingResetEl.classList.remove('hidden');
+                if (modalResetRequestEl) modalResetRequestEl.classList.add('hidden');
+            } else {
+                if (votes[myPlayerId] === undefined) {
+                    // Player has NOT voted yet: show Accept/Decline modal
+                    if (resetRequestTextEl) {
+                        resetRequestTextEl.textContent = `${resetReq.requesterName} wants to restart the game. Do you accept?`;
+                    }
+                    if (modalResetRequestEl) modalResetRequestEl.classList.remove('hidden');
+                    if (modalWaitingResetEl) modalWaitingResetEl.classList.add('hidden');
+                } else {
+                    // Player HAS voted (accepted): hide request modal and show waiting modal
+                    if (modalResetRequestEl) modalResetRequestEl.classList.add('hidden');
+                    if (modalWaitingResetEl) modalWaitingResetEl.classList.remove('hidden');
+                }
+            }
+
+            // Check if all online/active players have accepted the vote
+            const activePlayers = players.filter(p => p && p.online !== false);
+            const totalActive = activePlayers.length;
+            const acceptedVotes = Object.values(votes).filter(v => v === true).length;
+
+            // Only the original requester executes the reset when all votes are collected
+            if (requesterId === myPlayerId && acceptedVotes >= totalActive && totalActive > 0) {
+                if (modalWaitingResetEl) modalWaitingResetEl.classList.add('hidden');
+                executeActualReset();
+            }
+        } else {
+            // Hide both modals if the request was canceled, declined, or completed
+            if (modalResetRequestEl) modalResetRequestEl.classList.add('hidden');
+            if (modalWaitingResetEl) modalWaitingResetEl.classList.add('hidden');
+        }
+
         const currentTurnPlayer = players[currentPlayerIdx];
         if (gameActive && currentTurnPlayer && currentTurnPlayer.online === false) {
-            // Only host advances the turn index to prevent conflicts
             if (myPlayerId === 0) {
                 endTurn();
             }
@@ -136,13 +208,20 @@ function listenToRoom(roomId) {
         drawBoardOverlays();
     });
 }
-
 // Function to push local actions (like rolling dice) up to Firebase
+// Function to push specific local player changes up to Firebase safely
+function syncPlayerPositionToFirebase(playerIndex, newPosition) {
+    if (!isMultiplayer || !currentRoomId) return;
+
+    db.ref(`rooms/${currentRoomId}/players/${playerIndex}`).update({
+        position: newPosition
+    });
+}
+
 function syncGameStateToFirebase() {
-    if (!isMultiplayer) return;
+    if (!isMultiplayer || !currentRoomId) return;
 
     db.ref('rooms/' + currentRoomId).update({
-        players: players,
         currentPlayerIdx: currentPlayerIdx,
         gameActive: gameActive
     });
@@ -405,7 +484,12 @@ function setupEventListeners() {
             renderSetupModalInputs();
         });
     });
-
+if (btnAcceptResetEl) {
+    btnAcceptResetEl.addEventListener('click', handleAcceptReset);
+}
+if (btnDeclineResetEl) {
+    btnDeclineResetEl.addEventListener('click', handleDeclineReset);
+}
     if (btnStartGame) btnStartGame.addEventListener('click', startGame);
     if (btnRollEl) btnRollEl.addEventListener('click', handleRollClick);
     if (btnSetupEl) btnSetupEl.addEventListener('click', () => modalSetupEl.classList.remove('hidden'));
@@ -607,7 +691,7 @@ function handleRollClick() {
     if (!gameActive || isRolling) return;
     
     if (isMultiplayer && currentPlayerIdx !== myPlayerId) {
-        alert("It's not your turn yet!");
+        showGameAlert("It's not your turn yet!", "Hold On");
         return;
     }
 
@@ -652,6 +736,9 @@ function getDiceEmoji(val) {
 function movePlayerSteps(player, steps) {
     player.position += steps;
     updateUI();
+    
+    // Sync ONLY this player's position directly to Firebase to avoid array conflicts
+    syncPlayerPositionToFirebase(player.id, player.position);
 
     const currentTile = player.position;
 
@@ -665,7 +752,6 @@ function movePlayerSteps(player, steps) {
         return;
     }
 
-    // Only the player whose turn it is should trigger local modals and events
     const isMyTurn = (!isMultiplayer || currentPlayerIdx === myPlayerId);
 
     if (SNAKES[currentTile]) {
@@ -686,7 +772,7 @@ function movePlayerSteps(player, steps) {
             logMessage(`🪜 ${player.name} climbed a ladder from ${currentTile} to <strong>${dest}</strong>!`);
             player.position = dest;
             updateUI();
-            syncGameStateToFirebase();
+            syncPlayerPositionToFirebase(player.id, player.position); // <--- Sync ladder jump
             
             if (isMyTurn) {
                 checkTileAction(player);
@@ -714,7 +800,6 @@ function checkTileAction(player) {
         setTimeout(endTurn, 500);
     }
 }
-
 function handleQuizTimeout(player, isSnakeBite) {
     playSFX('wrong');
     if (modalQuizEl) modalQuizEl.classList.add('hidden');
@@ -728,7 +813,8 @@ function handleQuizTimeout(player, isSnakeBite) {
     }
 
     updateUI();
-    syncGameStateToFirebase();
+    syncPlayerPositionToFirebase(player.id, player.position);
+    pendingSnakeTail = null; // Clear pending state
     endTurn();
 }
 
@@ -749,15 +835,16 @@ function submitAnswer(chosenIdx, player, isSnakeBite = false) {
         playSFX('wrong');
         if (isSnakeBite) {
             logMessage(`❌ ${player.name} failed the hardest question! Sliding down to Tile <strong>${pendingSnakeTail}</strong>.`);
-            player.position = pendingSnakeTail;
+            player.position = pendingSnakeTail; // Move down to snake tail
         } else {
             logMessage(`❌ ${player.name} gave an incorrect answer! Going back to Tile ${previousTile}.`);
-            player.position = previousTile;
+            player.position = previousTile; // Return to pre-roll tile
         }
         updateUI();
     }
 
-    syncGameStateToFirebase();
+    syncPlayerPositionToFirebase(player.id, player.position);
+    pendingSnakeTail = null; // Clear pending state
     endTurn();
 }
 function checkTileAction(player) {
@@ -827,51 +914,9 @@ function startQuizTimer(seconds, player, isAI, isSnakeBite = false) {
     }, 1000);
 }
 
-function handleQuizTimeout(player, isSnakeBite) {
-    playSFX('wrong');
-    if (modalQuizEl) modalQuizEl.classList.add('hidden');
 
-    if (isSnakeBite) {
-        logMessage(`⌛ ${player.name} ran out of time on the hardest snake question! Sliding down to Tile <strong>${pendingSnakeTail}</strong>.`);
-        player.position = pendingSnakeTail;
-    } else {
-        logMessage(`⌛ ${player.name} ran out of time! Returning to Tile ${previousTile}.`);
-        player.position = previousTile;
-    }
 
-    updateUI();
-    syncGameStateToFirebase();
-    endTurn();
-}
 
-function submitAnswer(chosenIdx, player, isSnakeBite = false) {
-    if (activeQuizTimer) clearInterval(activeQuizTimer);
-
-    const isCorrect = (chosenIdx === currentQuizData.ans);
-    if (modalQuizEl) modalQuizEl.classList.add('hidden');
-
-    if (isCorrect) {
-        playSFX('correct');
-        if (isSnakeBite) {
-            logMessage(`✅ ${player.name} answered the hardest snake question correctly! They bravely resisted the slide and stay on Tile ${player.position}!`);
-        } else {
-            logMessage(`✅ ${player.name} answered correctly! Stays on Tile ${player.position}.`);
-        }
-    } else {
-        playSFX('wrong');
-        if (isSnakeBite) {
-            logMessage(`❌ ${player.name} failed the hardest question! Sliding down to Tile <strong>${pendingSnakeTail}</strong>.`);
-            player.position = pendingSnakeTail;
-        } else {
-            logMessage(`❌ ${player.name} gave an incorrect answer! Going back to Tile ${previousTile}.`);
-            player.position = previousTile;
-        }
-        updateUI();
-    }
-
-    syncGameStateToFirebase();
-    endTurn();
-}
 
 // ==========================================
 // 9. TURN CYCLING & UI RENDERERS
@@ -893,24 +938,25 @@ function endTurn() {
 }
 
 function updateUI() {
-    // 1. Clear all token containers on the board
+    // 1. Clear all token containers on the board safely
     for (let i = 1; i <= 100; i++) {
         const tokBox = document.getElementById(`tokens-${i}`);
         if (tokBox) tokBox.innerHTML = '';
     }
 
     // 2. Filter active players (exclude those who left / online === false)
-    const activePlayers = players.filter(p => p.online !== false);
+    const activePlayers = players.filter(p => p && p.online !== false);
 
     // 3. Render board tokens only for active online players
     activePlayers.forEach(p => {
-        const tokBox = document.getElementById(`tokens-${p.position}`);
+        const tileNum = parseInt(p.position);
+        const tokBox = document.getElementById(`tokens-${tileNum}`);
         if (tokBox) {
             const token = document.createElement('span');
-            token.className = 'text-xs px-1 py-0.5 rounded shadow text-slate-950 font-bold';
-            token.style.backgroundColor = p.color;
-            token.textContent = p.avatar;
-            token.title = p.name;
+            token.className = 'text-xs px-1 py-0.5 rounded shadow text-slate-950 font-bold inline-block m-0.5';
+            token.style.backgroundColor = p.color || '#f59e0b';
+            token.textContent = p.avatar || '👤';
+            token.title = p.name || 'Player';
             tokBox.appendChild(token);
         }
     });
@@ -946,10 +992,65 @@ function updateUI() {
         });
     }
 }
-
 function resetGame() {
     if (players.length === 0) return;
-    
+
+    // Single-player mode resets immediately
+    if (!isMultiplayer || !currentRoomId) {
+        executeActualReset();
+        return;
+    }
+
+    const requestingPlayer = players[myPlayerId];
+    const requesterName = requestingPlayer ? requestingPlayer.name : `Player ${myPlayerId + 1}`;
+
+    // Create a reset request on Firebase
+    db.ref(`rooms/${currentRoomId}/resetRequest`).set({
+        requestedBy: myPlayerId,
+        requesterName: requesterName,
+        votes: {
+            [myPlayerId]: true // Auto-accept for the requester
+        }
+    });
+
+    // Show the waiting modal for the requester
+    if (modalWaitingResetEl) modalWaitingResetEl.classList.remove('hidden');
+
+    logMessage(`⏳ <strong>${requesterName}</strong> requested to restart the game. Waiting for players to accept...`);
+}
+function logMessage(msg) {
+    if (!isMultiplayer || !currentRoomId) {
+        // Fallback for single-player / offline mode
+        appendLogToDOM(msg);
+        return;
+    }
+
+    // Push log to Firebase room reference
+    const logsRef = db.ref(`rooms/${currentRoomId}/logs`);
+    logsRef.once('value', (snapshot) => {
+        let logs = snapshot.val() || [];
+        logs.push(msg);
+        
+        // Keep only the latest 50 logs to optimize performance
+        if (logs.length > 50) {
+            logs = logs.slice(logs.length - 50);
+        }
+
+        logsRef.set(logs);
+    });
+}
+
+// Helper function to handle actual DOM rendering
+function appendLogToDOM(msg) {
+    if (!gameLogEl) return;
+    const p = document.createElement('p');
+    p.innerHTML = msg;
+    gameLogEl.appendChild(p);
+    gameLogEl.scrollTop = gameLogEl.scrollHeight;
+}
+
+// Executes the actual board reset
+function executeActualReset() {
     generateRandomBoardLayout();
     initBoard();
 
@@ -957,16 +1058,50 @@ function resetGame() {
     currentPlayerIdx = 0;
     gameActive = true;
     prepareRumbledDeck();
-    logMessage("Game reset with a new randomized board layout!");
+
     updateUI();
     setTimeout(drawBoardOverlays, 100);
-    syncGameStateToFirebase();
+
+    if (isMultiplayer && currentRoomId) {
+        // Reset player positions on Firebase individually
+        players.forEach(p => {
+            db.ref(`rooms/${currentRoomId}/players/${p.id}`).update({ position: 1 });
+        });
+
+        // Update room properties and clear the request
+        db.ref(`rooms/${currentRoomId}`).update({
+            gameActive: true,
+            currentPlayerIdx: 0,
+            boardLayout: { ladders: LADDERS, snakes: SNAKES, quizTiles: QUIZ_TILES },
+            resetRequest: null
+        });
+
+        logMessage("🔄 The game has been restarted with a new randomized board layout!");
+    } else {
+        logMessage("Game reset with a new randomized board layout!");
+    }
 }
 
-function logMessage(msg) {
-    if (!gameLogEl) return;
-    const p = document.createElement('p');
-    p.innerHTML = msg;
-    gameLogEl.appendChild(p);
-    gameLogEl.scrollTop = gameLogEl.scrollHeight;
+// Handler when local player clicks Accept
+// Handler when local player clicks Accept
+function handleAcceptReset() {
+    if (modalResetRequestEl) modalResetRequestEl.classList.add('hidden');
+    if (modalWaitingResetEl) modalWaitingResetEl.classList.remove('hidden'); // <--- Show waiting modal upon accepting
+    
+    if (!isMultiplayer || !currentRoomId) return;
+
+    db.ref(`rooms/${currentRoomId}/resetRequest/votes/${myPlayerId}`).set(true);
+}
+
+// Handler when local player clicks Decline
+function handleDeclineReset() {
+    if (modalResetRequestEl) modalResetRequestEl.classList.add('hidden');
+    if (modalWaitingResetEl) modalWaitingResetEl.classList.add('hidden'); // <--- Ensure waiting modal closes too
+    if (!isMultiplayer || !currentRoomId) return;
+
+    const decliningPlayer = players[myPlayerId];
+    const declinerName = decliningPlayer ? decliningPlayer.name : `Player ${myPlayerId + 1}`;
+
+    db.ref(`rooms/${currentRoomId}/resetRequest`).remove();
+    logMessage(`❌ <strong>${declinerName}</strong> declined the restart request. Game continues!`);
 }
