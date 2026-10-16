@@ -3,16 +3,6 @@
 // ==========================================
 // MULTIPLAYER FIREBASE CONFIGURATION
 // ==========================================
-const firebaseConfig = {
-    apiKey: "AIzaSyDVvAmovZJVFdPfkcc3pwlE1iwlYQOWIGk",
-    authDomain: "snake-and-ladder-5319f.firebaseapp.com",
-    databaseURL: "https://snake-and-ladder-5319f-default-rtdb.firebaseio.com",
-    projectId: "snake-and-ladder-5319f",
-    storageBucket: "snake-and-ladder-5319f.firebasestorage.app",
-    messagingSenderId: "1039047969635",
-    appId: "1:1039047969635:web:ec8fa82d7883a347316156",
-    measurementId: "G-3P7JMECBVB"
-};
 
 // Initialize Firebase (Compat mode matches our database functions)
 firebase.initializeApp(firebaseConfig);
@@ -348,6 +338,7 @@ const btnStartGame = document.getElementById('btn-start-game');
 const btnSetupEl = document.getElementById('btn-setup');
 const btnResetEl = document.getElementById('btn-reset');
 const btnVictoryRestart = document.getElementById('btn-victory-restart');
+const btnVictoryNewGame = document.getElementById('btn-victory-new-game');
 
 const quizQuestionEl = document.getElementById('quiz-question');
 const quizOptionsEl = document.getElementById('quiz-options');
@@ -399,25 +390,10 @@ function generateRandomBoardLayout() {
         return arr;
     };
 
-    const randomizedLadderStarts = shuffle([2, 5, 11, 18, 23, 35, 48, 60]);
-    const randomizedLadderHeights = shuffle([10, 15, 20, 25, 30, 35, 40, 45]);
-    
-    for (let i = 0; i < 8; i++) {
-        let start = randomizedLadderStarts[i];
-        let end = Math.min(99, start + randomizedLadderHeights[i]);
-        if (start >= end) end = start + 5;
-        LADDERS[start] = end;
-    }
-
-    const randomizedSnakeHeads = shuffle([96, 90, 85, 78, 69, 58, 44, 32]);
-    const randomizedSnakeDrops = shuffle([10, 15, 20, 25, 30, 35, 40, 45]);
-
-    for (let i = 0; i < 8; i++) {
-        let head = randomizedSnakeHeads[i];
-        let tail = Math.max(2, head - randomizedSnakeDrops[i]);
-        if (head <= tail) tail = head - 5;
-        SNAKES[head] = tail;
-    }
+    // Carefully spaced fixed connections: no crossing or overlapping paths.
+    // Dice, quiz selection, player movement and multiplayer rules remain unchanged.
+    LADDERS = { 2:20, 5:16, 11:31, 18:40, 23:38, 35:56, 48:68, 60:80 };
+    SNAKES  = { 32:12, 44:25, 58:42, 69:51, 78:64, 85:65, 90:72, 96:81 };
 
     const occupiedTiles = new Set([1, 100, ...Object.keys(LADDERS).map(Number), ...Object.values(LADDERS), ...Object.keys(SNAKES).map(Number), ...Object.values(SNAKES)]);
     let availableTiles = [];
@@ -495,8 +471,30 @@ if (btnDeclineResetEl) {
     if (btnSetupEl) btnSetupEl.addEventListener('click', () => modalSetupEl.classList.remove('hidden'));
     if (btnResetEl) btnResetEl.addEventListener('click', resetGame);
     if (btnVictoryRestart) btnVictoryRestart.addEventListener('click', () => {
-        modalVictoryEl.classList.add('hidden');
-        resetGame();
+        if (!isMultiplayer || !currentRoomId) modalVictoryEl.classList.add('hidden');
+        resetGame(); // Multiplayer continues to use the existing restart approval flow.
+    });
+
+    // Start a fresh match with a new player setup. Existing online rooms must
+    // not be reset unilaterally; return to the lobby to create/join a new room.
+    if (btnVictoryNewGame) btnVictoryNewGame.addEventListener('click', () => {
+        if (isMultiplayer && currentRoomId) {
+            window.location.assign('index.html');
+            return;
+        }
+        gameActive = false;
+        isRolling = false;
+        players = [];
+        currentPlayerIdx = 0;
+        previousTile = 1;
+        generateRandomBoardLayout();
+        initBoard();
+        renderSetupModalInputs();
+        updateUI();
+        if (gameLogEl) gameLogEl.innerHTML = '';
+        if (modalVictoryEl) modalVictoryEl.classList.add('hidden');
+        if (modalSetupEl) modalSetupEl.classList.remove('hidden');
+        setTimeout(drawBoardOverlays, 100);
     });
 
     window.addEventListener('resize', drawBoardOverlays);
@@ -953,7 +951,7 @@ function updateUI() {
         const tokBox = document.getElementById(`tokens-${tileNum}`);
         if (tokBox) {
             const token = document.createElement('span');
-            token.className = 'text-xs px-1 py-0.5 rounded shadow text-slate-950 font-bold inline-block m-0.5';
+            token.className = 'player-token text-xs px-1 py-0.5 rounded shadow text-slate-950 font-bold inline-block m-0.5';
             token.style.backgroundColor = p.color || '#f59e0b';
             token.textContent = p.avatar || '👤';
             token.title = p.name || 'Player';
@@ -1076,9 +1074,9 @@ function executeActualReset() {
             resetRequest: null
         });
 
-        logMessage("🔄 The game has been restarted with a new randomized board layout!");
+        logMessage("🔄 The game has been restarted with a clean board layout!");
     } else {
-        logMessage("Game reset with a new randomized board layout!");
+        logMessage("Game reset with a clean board layout!");
     }
 }
 

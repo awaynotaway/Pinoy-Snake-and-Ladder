@@ -8,13 +8,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans min-h-screen pb-12">
+<body data-page="game" class="bg-slate-900 text-slate-100 font-sans min-h-screen pb-12">
 
     <!-- Header Section -->
     <header class="bg-slate-800 border-b border-slate-700 py-4 px-6 shadow-lg mb-6">
         <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center space-x-3">
-                <span class="text-3xl">🇵🇭</span>
+                <img class="header-mascot" src="pinoy-quest-mascot.png" alt="Pinoy Quest mascot">
                 <div>
                     <h1 class="text-2xl font-black tracking-wide text-amber-400">PINOY QUEST</h1>
                     <p class="text-xs text-slate-400">Philippine Quiz Snakes & Ladders Edition</p>
@@ -22,6 +22,7 @@
             </div>
             <div class="flex items-center gap-3">
              
+                <a href="index.html" id="btn-main-menu" class="bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow">🏠 Back to Main Menu</a>
                 <button id="btn-reset" class="bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow">
                     🔄 Restart Game
                 </button>
@@ -35,8 +36,23 @@
         <!-- Left Column: Game Board (8 cols on lg) -->
         <section class="lg:col-span-8 flex flex-col items-center">
             <div class="relative w-full max-w-[650px] aspect-square bg-slate-800 rounded-2xl p-3 border-2 border-slate-700 shadow-2xl overflow-hidden">
+                <!-- Decorative SVG symbols used by the existing board overlay (visual only) -->
+                <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
+                  <defs>
+                    <marker id="cartoon-snake-head" markerWidth="6" markerHeight="6" refX="2.8" refY="3" orient="auto" markerUnits="strokeWidth" viewBox="0 0 6 6">
+                      <path d="M1 3 Q.8 .7 3 .7 Q5.6 .7 5.5 3 Q5.6 5.4 3 5.4 Q.8 5.4 1 3Z" fill="#ed755d" stroke="#813e37" stroke-width=".3"/>
+                      <circle cx="3.3" cy="1.9" r=".38" fill="#fff"/><circle cx="3.4" cy="2" r=".2" fill="#302323"/>
+                      <circle cx="3.3" cy="4.1" r=".38" fill="#fff"/><circle cx="3.4" cy="4" r=".2" fill="#302323"/>
+                      <path d="M5.2 3 L5.9 3" stroke="#d44150" stroke-width=".3" stroke-linecap="round"/>
+                    </marker>
+                    <marker id="cartoon-ladder-end" markerWidth="3" markerHeight="3" refX="1.5" refY="1.5" orient="auto" markerUnits="strokeWidth" viewBox="0 0 3 3">
+                      <rect x=".5" y=".6" width="2" height="1.8" rx=".4" fill="#a66a34" stroke="#744822" stroke-width=".3"/>
+                    </marker>
+                  </defs>
+                </svg>
                 <!-- SVG Overlay for Ladder Lines -->
                 <svg id="ladder-canvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+                <svg id="cartoon-board-art" class="absolute inset-0 w-full h-full pointer-events-none z-10" aria-hidden="true"></svg>
                 
                 <!-- 10x10 Grid Container -->
                 <div id="board-grid" class="w-full h-full grid grid-cols-10 grid-rows-10 gap-1 sm:gap-1.5"></div>
@@ -157,6 +173,9 @@
             <button id="btn-victory-restart" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-xl text-lg shadow-lg">
                 PLAY AGAIN
             </button>
+            <button id="btn-victory-new-game" type="button" class="mt-3 w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-xl text-lg shadow-lg">
+                NEW GAME
+            </button>
         </div>
     </div>
 
@@ -202,8 +221,10 @@
 </div>
 
     <!-- Link to JavaScript Code -->
+     <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <script src="script.js"></script>
+<script src="board-art.js"></script>
 </body>
 </html>
